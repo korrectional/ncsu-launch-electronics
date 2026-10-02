@@ -2,5 +2,5 @@
 
 #include "globals.hpp"
 
-void calculateAverages();
+float calculateAverages(float list[3], int size);
 void figureOutState();

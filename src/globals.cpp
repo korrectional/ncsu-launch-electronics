@@ -22,7 +22,6 @@ float magX_avg, magY_avg, magZ_avg;
 float quatReal_avg, quatI_avg, quatJ_avg, quatK_avg;
 float pressure_hPa_avg;
 float temperature_C_avg;
-volatile bool dps_data_ready = false;
 
 float velocityZ;
 
@@ -30,4 +29,18 @@ unsigned long currentTime = 0;
 unsigned long lastTime = 0;
 float deltaTime = 0.0f;
 
-
+float accelx_list[3] = {0.0f, 0.0f, 0.0f};
+float accely_list[3] = {0.0f, 0.0f, 0.0f};
+float accelz_list[3] = {0.0f, 0.0f, 0.0f};
+float gyrox_list[3] = {0.0f, 0.0f, 0.0f};
+float gyroy_list[3] = {0.0f, 0.0f, 0.0f};
+float gyroz_list[3] = {0.0f, 0.0f, 0.0f};
+float magx_list[3] = {0.0f, 0.0f, 0.0f};
+float magy_list[3] = {0.0f, 0.0f, 0.0f};
+float magz_list[3] = {0.0f, 0.0f, 0.0f};
+float quatReal_list[3] = {0.0f, 0.0f, 0.0f};
+float quatI_list[3] = {0.0f, 0.0f, 0.0f};
+float quatJ_list[3] = {0.0f, 0.0f, 0.0f};
+float quatK_list[3] = {0.0f, 0.0f, 0.0f};
+float pressure_list[3] = {0.0f, 0.0f, 0.0f};
+float temperature_list[3] = {0.0f, 0.0f, 0.0f};

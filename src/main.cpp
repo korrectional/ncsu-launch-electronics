@@ -58,11 +58,9 @@ void loop() {
     for (int i = 0; i < 3; i++) {
         readBNO08x();
         readDPS310();
-        calculateAverages();
     }
     readBNO08x();
     readDPS310();
-    calculateAverages();
 
     
 
