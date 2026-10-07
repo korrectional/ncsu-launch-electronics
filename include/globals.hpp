@@ -1,12 +1,16 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Wire.h>
+#include <SPI.h>
 #include <Adafruit_BNO08x.h>
 #include <Adafruit_DPS310.h>
 
-#define BNO08X_RESET 3
-#define BNO08X_INT   2
+// SPI chip-select / control pins (Nano 33 BLE default SPI: MOSI=11, MISO=12, SCK=13)
+#define BNO08X_CS    2
+#define BNO08X_INT   5
+#define BNO08X_RESET 6
+#define DPS310_CS    3
+#define SD_CS        4  // reserved for future SD-card logging (writeSD)
 
 #define STATE_STANDBY 0
 #define STATE_BOOST 1

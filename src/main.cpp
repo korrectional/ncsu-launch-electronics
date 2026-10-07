@@ -8,10 +8,13 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
 
-    Wire.begin();
+    SPI.begin();
 
-    // Init BNO08x
-    if (!bno08x.begin_I2C()) {
+    // Init BNO08x over SPI
+    // NOTE: BNO085 must be placed in SPI mode by pulling P0 and P1 HIGH
+    // (bridge both mode-select solder jumpers on the back of the breakout).
+    // INT (D5) and RST (D6) are required for reliable SPI operation.
+    if (!bno08x.begin_SPI(BNO08X_CS, BNO08X_INT)) {
         Serial.println("Failed to find BNO085!");
         while (1) delay(10);
     }
@@ -22,8 +25,8 @@ void setup() {
     bno08x.enableReport(SH2_MAGNETIC_FIELD_CALIBRATED);
     bno08x.enableReport(SH2_ROTATION_VECTOR);
 
-    // Init DPS310
-    if (!dps.begin_I2C()) {
+    // Init DPS310 over SPI
+    if (!dps.begin_SPI(DPS310_CS)) {
         Serial.println("Failed to find DPS310!");
         while (1) delay(10);
     }
