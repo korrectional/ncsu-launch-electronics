@@ -5,12 +5,14 @@
 #include <Adafruit_BNO08x.h>
 #include <Adafruit_DPS310.h>
 
-// SPI chip-select / control pins (Nano 33 BLE default SPI: MOSI=11, MISO=12, SCK=13)
-#define BNO08X_CS    2
-#define BNO08X_INT   5
-#define BNO08X_RESET 6
-#define DPS310_CS    3
-#define SD_CS        4  // reserved for future SD-card logging (writeSD)
+// SPI chip-select / control pins (Nano Every default SPI: MOSI=11, MISO=12, SCK=13)
+// The megaAVR Arduino core does NOT define D0..D13 macros, so use the numeric
+// Arduino pin index (the number silkscreened next to "Dx").
+#define BNO08X_CS    5  // D5  - BNO085 chip select
+#define BNO08X_INT   6  // D6  - BNO085 active-low data-ready interrupt (required for SPI)
+#define BNO08X_RESET 7  // D7  - BNO085 active-low reset (required for SPI)
+#define DPS310_CS    3  // D3  - DPS310 chip select
+#define SD_CS        2  // D2  - SD-card reader chip select (writeSD logging)
 
 #define STATE_STANDBY 0
 #define STATE_BOOST 1

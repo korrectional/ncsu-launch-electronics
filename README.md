@@ -41,12 +41,35 @@ The Nano 33 BLE's default SPI pins are used for the shared bus:
 
 | Device | Signal | Nano 33 BLE pin | Notes |
 |---|---|---|---|
-| BNO085 | CS | D2 | `BNO08X_CS` — drop low to talk to the BNO085 |
-| BNO085 | INT | D5 | `BNO08X_INT` — active-low data-ready; **required** for SPI |
-| BNO085 | RST | D6 | `BNO08X_RESET` — active-low reset; wire for stable SPI |
+| BNO085 | CS | D5 | `BNO08X_CS` — drop low to talk to the BNO085 |
+| BNO085 | INT | D6 | `BNO08X_INT` — active-low data-ready; **required** for SPI |
+| BNO085 | RST | D7 | `BNO08X_RESET` — active-low reset; wire for stable SPI |
 | DPS310 | CS | D3 | `DPS310_CS` — drop low to talk to the DPS310 |
-| SD card (future) | CS | D4 | `SD_CS` — reserved for `writeSD()` logging |
+| SD card | CS | D2 | `SD_CS` — chip select for `writeSD()` logging |
+
+### DPS310 wiring (explicit)
+
+| DPS310 breakout pin | Nano pin | Notes |
+|---|---|---|
+| `VIN` | `5V` | sets the header logic level (5V for the Nano Every) |
+| `GND` | `GND` | common ground |
+| `SCK` | `D13` | SPI clock |
+| `SDI` | `D11` | MOSI (Nano -> sensor) |
+| `SDO` | `D12` | MISO (sensor -> Nano) |
+| `CS` | `D3` | chip select (`DPS310_CS`) |
+| `3Vo` | *unconnected* | regulator output, leave open |
 
 > **BNO085 mode jumpers:** the breakout defaults to I2C. To use SPI you must
 > bridge **both** the `P0` and `P1` mode-select solder jumpers on the back of
 > the board to **3V** (PS1 = High, PS0 = High = SPI).
+
+
+
+
+d2- SD reader CS
+d3- DSP CS
+d4- none
+d5- BNO CS
+d6- BNO INT
+d7- BNO RST
+d8- SD reader CD

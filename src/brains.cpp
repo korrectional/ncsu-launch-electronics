@@ -1,6 +1,16 @@
 #include "brains.hpp"
 #include "globals.hpp"
 
+#include <math.h>
+
+// Flight thresholds -- tune these to the vehicle.
+// The accelerometer reports proper acceleration, so with the rocket's +Z axis
+// pointing up it reads about +9.81 m/s^2 while the rocket sits on the pad.
+static constexpr float GRAVITY       = 9.81f;  // m/s^2
+static constexpr float LAUNCH_ACCEL  = 20.0f;  // m/s^2, boost detection
+static constexpr float BURNOUT_ACCEL = 1.0f;   // m/s^2, "thrust is gone"
+static constexpr float VELOCITY_EPS  = 1.0f;   // m/s, near-zero velocity
+
 
 float calculateAverages(float list[3], int size){       
     // TODO store last 3 data readings for all important variables (eg accelZ)
@@ -41,28 +51,56 @@ void figureOutState(){
     }
     */
     
-    if (accelZ_avg >= 20 && velocityZ>1) {
-        state = STATE_BOOST;
-    }
+    // Forward-only state machine: once a flight phase is entered it never
+    // steps backwards, so a noisy reading cannot rewind the flight.
+    switch (state) {
+        case STATE_STANDBY:
+            // On the pad until real thrust shows up.
+            if (accelZ_avg >= LAUNCH_ACCEL && velocityZ > VELOCITY_EPS) {
+                state = STATE_BOOST;
+            }
+            break;
 
-    if (accelZ_avg < 1 && velocityZ>0) {
-        state = STATE_COAST;
-    }
+        case STATE_BOOST:
+            // Burnout: thrust is gone, but the rocket is still climbing.
+            if (accelZ_avg < BURNOUT_ACCEL && velocityZ > 0.0f) {
+                state = STATE_COAST;
+            }
+            break;
 
-    if (velocityZ <= 1 && velocityZ >= -1) {
-        state = STATE_APOGEE;
-    }
+        case STATE_COAST:
+            // Still motor-off; once the climb is nearly spent call it apogee.
+            if (velocityZ <= VELOCITY_EPS) {
+                state = STATE_APOGEE;
+            }
+            break;
 
-    if (velocityZ < -1) {
-        state = STATE_DESCENT;
-    }
+        case STATE_APOGEE:
+            // Vertical velocity went negative -> coming back down.
+            if (velocityZ < -VELOCITY_EPS) {
+                state = STATE_DESCENT;
+            }
+            break;
 
-    if (accelZ_avg < 1 && velocityZ < 1) {
-        state = STATE_LANDED;
-    }   
+        case STATE_DESCENT:
+            // Touchdown: vertical speed is ~0 and 1g is back because the rocket
+            // is resting on the ground again.
+            if (fabsf(velocityZ) < VELOCITY_EPS && accelZ_avg > BURNOUT_ACCEL) {
+                state = STATE_LANDED;
+            }
+            break;
+
+        case STATE_LANDED:
+        default:
+            break;
+    }
 
 }
 
 void calculateVelocityZ(){
-    velocityZ += accelZ_avg * deltaTime;
+    // deltaTime is in milliseconds, so convert to seconds first.
+    float dt = deltaTime / 1000.0f;
+    // Integrate only the net vertical acceleration (remove the constant 1g the
+    // sensor reports while the rocket sits on the pad).
+    velocityZ += (accelZ_avg - GRAVITY) * dt;
 }
