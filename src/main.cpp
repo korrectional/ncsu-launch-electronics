@@ -40,6 +40,53 @@ static void debugSPI() {
     Serial.println(digitalRead(12));
 }
 
+// Pulse the BNO085 reset and watch its INT line (active low). In SPI mode the
+// chip asserts INT shortly after reset to announce itself. If INT never goes
+// low, the chip is either not running in SPI mode (PS0/PS1 not both high at
+// reset), not powered, or INT/RST is not wired.
+//
+// NOTE: with a jumper between D11 (MOSI) and D12 (MISO) the loopback below must
+// print 0xA5; anything else means the Nano's own SPI/MISO path is the problem.
+static void debugBNO() {
+    // Loopback probe of the Nano's SPI master (requires the D11-D12 jumper).
+    pinMode(11, OUTPUT);
+    pinMode(12, INPUT);
+    digitalWrite(11, HIGH);
+    delayMicroseconds(10);
+    int loopHigh = digitalRead(12);
+    digitalWrite(11, LOW);
+    delayMicroseconds(10);
+    int loopLow = digitalRead(12);
+    Serial.print("SPI loopback (needs D11-D12 jumper): high=");
+    Serial.print(loopHigh);
+    Serial.print(" low=");
+    Serial.println(loopLow);
+
+    pinMode(BNO08X_INT, INPUT_PULLUP);
+    Serial.print("BNO INT (D6) idle level: ");
+    Serial.println(digitalRead(BNO08X_INT));
+
+    // Hardware reset: PS0/PS1 are latched here, so they must already be high.
+    pinMode(BNO08X_RESET, OUTPUT);
+    digitalWrite(BNO08X_RESET, HIGH);
+    delay(10);
+    digitalWrite(BNO08X_RESET, LOW);
+    delay(10);
+    digitalWrite(BNO08X_RESET, HIGH);
+
+    unsigned long t0 = millis();
+    while (digitalRead(BNO08X_INT) == HIGH && (millis() - t0) < 1000) {
+        // wait up to 1 s for the chip to drive INT low
+    }
+    if (digitalRead(BNO08X_INT) == LOW) {
+        Serial.print("BNO asserted INT after reset (chip alive in SPI mode) after ");
+        Serial.print(millis() - t0);
+        Serial.println(" ms.");
+    } else {
+        Serial.println("BNO never asserted INT -> not in SPI mode / not powered / INT not wired.");
+    }
+}
+
 // -------------------------------------------------------------------------
 // Sensor bring-up (all over SPI)
 // -------------------------------------------------------------------------
@@ -101,6 +148,7 @@ void setup() {
     SPI.begin();
 
     debugSPI();
+    debugBNO();
 
     lastSensorAttempt = millis();
     sensorsReady = initSensors();
