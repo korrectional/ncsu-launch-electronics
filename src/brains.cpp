@@ -11,6 +11,28 @@ static constexpr float CLIMB_RATE_BURNOUT  = 5.0f;  // m/s, climb rate falling t
 static constexpr float VELOCITY_APOGEE_EPS = 0.5f;  // m/s, "vertical velocity ~ 0"
 static constexpr float ALTITUDE_LANDED_M   = 2.0f;  // m above the pad -> back on the ground
 
+// A transition condition must hold on several consecutive loop iterations
+// before the state machine acts on it (added in PR #14). The flight loop runs
+// ~20 Hz, so 3 confirmations is ~150 ms of agreement -- long enough to reject a
+// single noisy barometer sample, short enough not to delay a real event.
+static constexpr int STATE_CONFIRM_COUNT = 3;
+static int conditionCounter = 0;
+
+// Returns true once `condition` has held for STATE_CONFIRM_COUNT calls in a
+// row. The counter is cleared on any false sample, and is consumed when the
+// condition is confirmed, so the next state starts counting from zero.
+static bool confirmed(bool condition) {
+    if (!condition) {
+        conditionCounter = 0;
+        return false;
+    }
+    if (++conditionCounter < STATE_CONFIRM_COUNT) {
+        return false;
+    }
+    conditionCounter = 0;
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Rolling average helper (unchanged)
 // ---------------------------------------------------------------------------
@@ -98,7 +120,7 @@ void figureOutState(){
     switch (state) {
         case STATE_STANDBY:
             // On the pad until the barometer shows we have actually climbed.
-            if (altitude_m_avg > ALTITUDE_LIFTOFF_M && velocityZ > VELOCITY_APOGEE_EPS) {
+            if (confirmed(altitude_m_avg > ALTITUDE_LIFTOFF_M && velocityZ > VELOCITY_APOGEE_EPS)) {
                 state = STATE_BOOST;
             }
             break;
@@ -106,28 +128,28 @@ void figureOutState(){
         case STATE_BOOST:
             // "Burnout" is now read as the climb rate falling off; without an
             // accelerometer there is no thrust measurement to key off.
-            if (velocityZ < CLIMB_RATE_BURNOUT) {
+            if (confirmed(velocityZ < CLIMB_RATE_BURNOUT)) {
                 state = STATE_COAST;
             }
             break;
 
         case STATE_COAST:
             // Still climbing; once the climb is nearly spent call it apogee.
-            if (velocityZ <= VELOCITY_APOGEE_EPS) {
+            if (confirmed(velocityZ <= VELOCITY_APOGEE_EPS)) {
                 state = STATE_APOGEE;
             }
             break;
 
         case STATE_APOGEE:
             // Vertical velocity went negative -> coming back down.
-            if (velocityZ < -VELOCITY_APOGEE_EPS) {
+            if (confirmed(velocityZ < -VELOCITY_APOGEE_EPS)) {
                 state = STATE_DESCENT;
             }
             break;
 
         case STATE_DESCENT:
             // Touchdown: vertical speed is ~0 and we are back near pad height.
-            if (fabsf(velocityZ) < VELOCITY_APOGEE_EPS && altitude_m_avg < ALTITUDE_LANDED_M) {
+            if (confirmed(fabsf(velocityZ) < VELOCITY_APOGEE_EPS && altitude_m_avg < ALTITUDE_LANDED_M)) {
                 state = STATE_LANDED;
             }
             break;
