@@ -2,13 +2,14 @@
 #include "brains.hpp"
 #include "sensors.hpp"
 
-// Sensor bring-up state. If a sensor is not detected we do NOT hang; we keep
-// retrying every SENSOR_RETRY_MS until it answers. The flight/log loop starts
-// as soon as the DPS310 is up, so its data can be validated on its own; the
-// BNO085 is retried in the background until it comes online.
+// Sensor bring-up state. If the DPS310 is not detected we do NOT hang; we keep
+// retrying every SENSOR_RETRY_MS until it answers. The flight/log loop starts as
+// soon as the DPS310 is up.
+//
+// NOTE: the BNO085 IMU has been dropped from this design. The DPS310 barometer
+// is the only sensor, and its pressure reading is what we turn into height.
 static const unsigned long SENSOR_RETRY_MS = 2000;
 static bool sensorsReady = false;
-static bool bnoReady = false;
 static bool dpsReady = false;
 static unsigned long lastSensorAttempt = 0;
 
@@ -32,7 +33,8 @@ static uint8_t dpsRawRead(uint8_t reg, uint8_t mode, uint32_t hz) {
 // and D12 (MISO) this must print 0xA5; if it prints 0xFF the Nano side (or the
 // MISO wire) is the problem, not the sensors.
 static void debugSPI() {
-    pinMode(BNO08X_CS, OUTPUT); digitalWrite(BNO08X_CS, HIGH);
+    // BNO085 chip select no longer driven; only the devices we still use.
+    // pinMode(BNO08X_CS, OUTPUT); digitalWrite(BNO08X_CS, HIGH);
     pinMode(DPS310_CS, OUTPUT); digitalWrite(DPS310_CS, HIGH);
     pinMode(SD_CS, OUTPUT);     digitalWrite(SD_CS, HIGH);
 
@@ -40,6 +42,11 @@ static void debugSPI() {
     Serial.println(digitalRead(12));
 }
 
+// -------------------------------------------------------------------------
+// BNO085 bring-up -- DISABLED
+// -------------------------------------------------------------------------
+// The IMU and its driver are no longer used. Kept commented out for reference.
+//
 // Pulse the BNO085 reset and watch its INT line (active low). In SPI mode the
 // chip asserts INT shortly after reset to announce itself. If INT never goes
 // low, the chip is either not running in SPI mode (PS0/PS1 not both high at
@@ -47,6 +54,7 @@ static void debugSPI() {
 //
 // NOTE: with a jumper between D11 (MOSI) and D12 (MISO) the loopback below must
 // print 0xA5; anything else means the Nano's own SPI/MISO path is the problem.
+/*
 static void debugBNO() {
     // Loopback probe of the Nano's SPI master (requires the D11-D12 jumper).
     pinMode(11, OUTPUT);
@@ -87,9 +95,6 @@ static void debugBNO() {
     }
 }
 
-// -------------------------------------------------------------------------
-// Sensor bring-up (all over SPI)
-// -------------------------------------------------------------------------
 static bool tryInitBNO() {
     if (bnoReady) return true;
 
@@ -105,6 +110,7 @@ static bool tryInitBNO() {
     bnoReady = ok;
     return ok;
 }
+*/
 
 static bool tryInitDPS() {
     if (dpsReady) return true;
@@ -129,8 +135,8 @@ static bool tryInitDPS() {
 }
 
 bool initSensors() {
-    tryInitBNO();
-    return tryInitDPS();   // the DPS alone is enough to start the loop
+    // tryInitBNO();  // BNO085 removed
+    return tryInitDPS();   // the DPS is all we need to start the loop
 }
 
 void setup() {
@@ -141,14 +147,14 @@ void setup() {
 
     // Park every chip-select high before we touch the bus. An unselected
     // device must not be able to drive MISO while we talk to another device.
-    pinMode(BNO08X_CS, OUTPUT); digitalWrite(BNO08X_CS, HIGH);
+    // pinMode(BNO08X_CS, OUTPUT); digitalWrite(BNO08X_CS, HIGH);  // BNO085 removed
     pinMode(DPS310_CS, OUTPUT); digitalWrite(DPS310_CS, HIGH);
     pinMode(SD_CS, OUTPUT);     digitalWrite(SD_CS, HIGH);
 
     SPI.begin();
 
     debugSPI();
-    debugBNO();
+    // debugBNO();  // BNO085 removed
 
     lastSensorAttempt = millis();
     sensorsReady = initSensors();
@@ -175,8 +181,9 @@ void writeSD() {
 
 void loop() {
     // Available Variables:
-    // accelX/Y/Z, gyroX/Y/Z, magX/Y/Z, quatReal/I/J/K, pressure_hPa, temperature_C
-    // as well as their averaged counterparts
+    // pressure_hPa, temperature_C as well as their averaged counterparts,
+    // plus altitude_m / altitude_m_avg / velocityZ derived from the pressure.
+    // (The BNO085's accel/gyro/mag/quat readings are no longer read.)
 
     // Bring-up phase: keep retrying until the DPS310 is up.
     if (!sensorsReady) {
@@ -192,13 +199,6 @@ void loop() {
         return;
     }
 
-    // Keep trying the BNO085 in the background so fixing PS0/PS1 does not
-    // require a reflash.
-    if (!bnoReady && millis() - lastSensorAttempt >= SENSOR_RETRY_MS) {
-        lastSensorAttempt = millis();
-        tryInitBNO();
-    }
-
     // Time since the previous loop iteration, in milliseconds.
     currentTime = millis();
     deltaTime = (float)(currentTime - lastTime);
@@ -206,11 +206,11 @@ void loop() {
 
     // Take a few samples so the 3-deep rolling averages have fresh data.
     for (int i = 0; i < 4; i++) {
-        if (bnoReady) readBNO08x();
+        // if (bnoReady) readBNO08x();  // BNO085 removed
         readDPS310();
     }
 
-    // Integrate acceleration into vertical velocity, then classify the flight.
+    // Differentiate the height into vertical velocity, then classify the flight.
     calculateVelocityZ();
     figureOutState();
     writeSD();
@@ -220,33 +220,7 @@ void loop() {
     if (millis() - lastPrint >= 500) {
         lastPrint = millis();
 
-        if (bnoReady) {
-            Serial.print("BNO reading:  aX=");
-            Serial.print(accelX, 2);
-            Serial.print(" aY=");
-            Serial.print(accelY, 2);
-            Serial.print(" aZ=");
-            Serial.print(accelZ, 2);
-            Serial.print(" m/s2 | gX=");
-            Serial.print(gyroX, 2);
-            Serial.print(" gY=");
-            Serial.print(gyroY, 2);
-            Serial.print(" gZ=");
-            Serial.print(gyroZ, 2);
-            Serial.print(" rad/s | q=");
-            Serial.print(quatReal, 3);
-            Serial.print(",");
-            Serial.print(quatI, 3);
-            Serial.print(",");
-            Serial.print(quatJ, 3);
-            Serial.print(",");
-            Serial.print(quatK, 3);
-            Serial.println();
-        } else {
-            Serial.println("BNO reading:  (not ready)");
-        }
-
-        Serial.print("DPS reading:  T = ");
+        Serial.print("DPS:  T = ");
         Serial.print(temperature_C, 2);
         Serial.print(" C   P = ");
         Serial.print(pressure_hPa, 2);
@@ -254,7 +228,26 @@ void loop() {
         Serial.print(temperature_C_avg, 2);
         Serial.print(" C, avg P = ");
         Serial.print(pressure_hPa_avg, 2);
-        Serial.println(" hPa");
+        Serial.print(" hPa");
+        Serial.println();
+
+        // Barometric height -- this is the number the flight logic runs on.
+        Serial.print("ALT:  altitude_m = ");
+        Serial.print(altitude_m, 2);
+        Serial.print(" m   altitude_m_avg = ");
+        Serial.print(altitude_m_avg, 2);
+        Serial.print(" m   maxAltitude_m = ");
+        Serial.print(maxAltitude_m, 2);
+        Serial.print(" m");
+        Serial.println();
+
+        // Derived climb rate, pad reference pressure, and current flight state.
+        Serial.print("ALT:  vZ = ");
+        Serial.print(velocityZ, 2);
+        Serial.print(" m/s   groundPressure_hPa = ");
+        Serial.print(groundPressure_hPa, 2);
+        Serial.print(" hPa   state = ");
+        Serial.println(state);
     }
 
     delay(50);

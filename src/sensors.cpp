@@ -2,6 +2,15 @@
 #include "globals.hpp"
 #include "brains.hpp"
 
+#include <math.h>
+
+// ---------------------------------------------------------------------------
+// BNO085 readout -- DISABLED
+// ---------------------------------------------------------------------------
+// The BNO085 IMU is no longer part of the flight computer; the DPS310 barometer
+// is the only sensor. The whole routine is kept commented out for reference in
+// case the IMU ever comes back. Nothing in the build calls it anymore.
+/*
 void readBNO08x() {
     if (bno08x.wasReset()) {
         Serial.println("BNO085 reset!");
@@ -13,13 +22,13 @@ void readBNO08x() {
                 accelX = sensorValue.un.accelerometer.x;
                 accelY = sensorValue.un.accelerometer.y;
                 accelZ = sensorValue.un.accelerometer.z;
-                //create variable and set up circular logic buffer to store last 3 readings of accelX/Y/Z 
+                //create variable and set up circular logic buffer to store last 3 readings of accelX/Y/Z
                 //and then calculate average of those 3 readings
                 static int accelIndex = 0;
                 accelx_list[accelIndex] = accelX;
                 accely_list[accelIndex] = accelY;
                 accelz_list[accelIndex] = accelZ;
-          
+
                 accelIndex = (accelIndex + 1) % 3;
                 //set up condition to check how many readings have been taken and find average
                 static int accelReadings = 1;
@@ -43,15 +52,11 @@ void readBNO08x() {
                 gyroX = sensorValue.un.gyroscope.x;
                 gyroY = sensorValue.un.gyroscope.y;
                 gyroZ = sensorValue.un.gyroscope.z;
-                //create variable and set up circular logic buffer to store last 3 readings of accelX/Y/Z 
-                //and then calculate average of those 3 readings
                 static int gyroIndex = 0;
                 gyrox_list[gyroIndex] = gyroX;
                 gyroy_list[gyroIndex] = gyroY;
                 gyroz_list[gyroIndex] = gyroZ;
-          
                 gyroIndex = (gyroIndex + 1) % 3;
-                //set up condition to check how many readings have been taken and find average
                 static int gyroReadings = 1;
                 if(gyroReadings >= 3){
                     gyroX_avg = calculateAverages(gyrox_list, 3);
@@ -73,15 +78,11 @@ void readBNO08x() {
                 magX = sensorValue.un.magneticField.x;
                 magY = sensorValue.un.magneticField.y;
                 magZ = sensorValue.un.magneticField.z;
-                //create variable and set up circular logic buffer to store last 3 readings of accelX/Y/Z 
-                //and then calculate average of those 3 readings
                 static int MagIndex = 0;
                 magx_list[MagIndex] = magX;
                 magy_list[MagIndex] = magY;
                 magz_list[MagIndex] = magZ;
-          
                 MagIndex = (MagIndex + 1) % 3;
-                //set up condition to check how many readings have been taken and find average
                 static int magReadings = 1;
                 if(magReadings >= 3){
                     magX_avg = calculateAverages(magx_list, 3);
@@ -104,16 +105,12 @@ void readBNO08x() {
                 quatI = sensorValue.un.rotationVector.i;
                 quatJ = sensorValue.un.rotationVector.j;
                 quatK = sensorValue.un.rotationVector.k;
-                //create variable and set up circular logic buffer to store last 3 readings of accelX/Y/Z 
-                //and then calculate average of those 3 readings
                 static int quatIndex = 0;
                 quatReal_list[quatIndex] = quatReal;
                 quatI_list[quatIndex] = quatI;
                 quatJ_list[quatIndex] = quatJ;
                 quatK_list[quatIndex] = quatK;
-
                 quatIndex = (quatIndex + 1) % 3;
-                //set up condition to check how many readings have been taken and find average
                 static int quatReadings = 1;
                 if(quatReadings >= 3){
                     quatReal_avg = calculateAverages(quatReal_list, 3);
@@ -137,20 +134,25 @@ void readBNO08x() {
         }
     }
 }
+*/
 
+// ---------------------------------------------------------------------------
+// DPS310 readout + barometric height
+// ---------------------------------------------------------------------------
 void readDPS310() {
     sensors_event_t temp_event, pressure_event;
     if (dps.temperatureAvailable() && dps.pressureAvailable()) {
         dps.getEvents(&temp_event, &pressure_event);
         temperature_C = temp_event.temperature;
         pressure_hPa = pressure_event.pressure;
-        //create variable and set up circular logic buffer to store last 3 readings of accelX/Y/Z 
-        //and then calculate average of those 3 readings
+
+        // 3-deep rolling buffer for the DPS readings.
         static int temp_pressureIndex = 0;
         temperature_list[temp_pressureIndex] = temperature_C;
         pressure_list[temp_pressureIndex] = pressure_hPa;
         temp_pressureIndex = (temp_pressureIndex + 1) % 3;
-        //set up condition to check how many readings have been taken and find average
+
+        // set up condition to check how many readings have been taken and find average
         static int temp_pressureReadings = 1;
         if(temp_pressureReadings >= 3){
             temperature_C_avg = calculateAverages(temperature_list, 3);
@@ -164,5 +166,13 @@ void readDPS310() {
             pressure_hPa_avg = pressure_hPa;
             temp_pressureReadings++;
         }
+
+        // Approximate height from the pressure. P0 is latched from the very
+        // first reading, so altitude_m is height above wherever we booted
+        // (the pad), not height above sea level.
+        if (groundPressure_hPa <= 0.0f) {
+            groundPressure_hPa = pressure_hPa;
+        }
+        updateAltitude(pressure_hPa_avg);
     }
 }

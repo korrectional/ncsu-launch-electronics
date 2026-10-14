@@ -75,11 +75,12 @@ static int parseHexByte(const char *s, int def = -1) {
 // Accepts a pin number or one of the named aliases.
 static int resolvePin(const char *s, int def = -1) {
     if (!s) return def;
-    if (ieq(s, "bno") || ieq(s, "bno_cs")) return BNO08X_CS;
+    // BNO085 aliases removed along with the sensor.
+    // if (ieq(s, "bno") || ieq(s, "bno_cs")) return BNO08X_CS;
     if (ieq(s, "dps") || ieq(s, "dps_cs")) return DPS310_CS;
     if (ieq(s, "sd")  || ieq(s, "sd_cs"))  return SD_CS;
-    if (ieq(s, "int")) return BNO08X_INT;
-    if (ieq(s, "rst")) return BNO08X_RESET;
+    // if (ieq(s, "int")) return BNO08X_INT;
+    // if (ieq(s, "rst")) return BNO08X_RESET;
     long v = parseNum(s, def);
     return (int)v;
 }
@@ -90,7 +91,8 @@ static void printByte(uint8_t b) {
 }
 
 static void parkAllCS() {
-    pinMode(BNO08X_CS, OUTPUT); digitalWrite(BNO08X_CS, HIGH);
+    // BNO085 chip select no longer driven.
+    // pinMode(BNO08X_CS, OUTPUT); digitalWrite(BNO08X_CS, HIGH);
     pinMode(DPS310_CS, OUTPUT); digitalWrite(DPS310_CS, HIGH);
     pinMode(SD_CS, OUTPUT);     digitalWrite(SD_CS, HIGH);
 }
@@ -123,10 +125,11 @@ static void cmdHelp() {
     Serial.println(F("  scan <cs> <start> <end>   read a register range (hex)"));
     Serial.println(F("  dps                       DPS310 ID (0x0D) in mode 0 and 3"));
     Serial.println(F("  dpsdump                   dump DPS310 regs 0x00..0x1F"));
-    Serial.println(F("  int                       read BNO INT (D6) level"));
-    Serial.println(F("  bnoreset                  pulse BNO RST, time the INT assert"));
+    // BNO085 commands disabled along with the sensor.
+    // Serial.println(F("  int                       read BNO INT (D6) level"));
+    // Serial.println(F("  bnoreset                  pulse BNO RST, time the INT assert"));
     Serial.println(F("  loop                      D11<->D12 loopback (needs jumper)"));
-    Serial.println(F("  <cs> = bno|dps|sd or a pin number   |  bytes are hex (8D)"));
+    Serial.println(F("  <cs> = dps|sd or a pin number   |  bytes are hex (8D)"));
 }
 
 static void printPinEq(int pin) {
@@ -136,10 +139,11 @@ static void printPinEq(int pin) {
 }
 
 static void cmdPins() {
-    Serial.print(F("CS: BNO(D")); Serial.print(BNO08X_CS); printPinEq(BNO08X_CS);
-    Serial.print(F("  DPS(D")); Serial.print(DPS310_CS); printPinEq(DPS310_CS);
+    // BNO085 pins dropped from the report.
+    // Serial.print(F("CS: BNO(D")); Serial.print(BNO08X_CS); printPinEq(BNO08X_CS);
+    Serial.print(F("CS: DPS(D")); Serial.print(DPS310_CS); printPinEq(DPS310_CS);
     Serial.print(F("  SD(D")); Serial.print(SD_CS); printPinEq(SD_CS);
-    Serial.print(F("  | INT(D")); Serial.print(BNO08X_INT); printPinEq(BNO08X_INT);
+    // Serial.print(F("  | INT(D")); Serial.print(BNO08X_INT); printPinEq(BNO08X_INT);
     Serial.print(F("  MISO(D12)=")); Serial.println(digitalRead(12));
 }
 
@@ -248,28 +252,31 @@ static void cmdDpsDump() {
     Serial.println();
 }
 
-static void cmdBnoReset() {
-    pinMode(BNO08X_INT, INPUT_PULLUP);
-    Serial.print(F("BNO INT idle = ")); Serial.println(digitalRead(BNO08X_INT));
-
-    pinMode(BNO08X_RESET, OUTPUT);
-    digitalWrite(BNO08X_RESET, HIGH);
-    delay(10);
-    digitalWrite(BNO08X_RESET, LOW);
-    delay(10);
-    digitalWrite(BNO08X_RESET, HIGH);
-
-    unsigned long t0 = millis();
-    while (digitalRead(BNO08X_INT) == HIGH && (millis() - t0) < 2000) { /* spin */ }
-
-    if (digitalRead(BNO08X_INT) == LOW) {
-        Serial.print(F("INT asserted after "));
-        Serial.print(millis() - t0);
-        Serial.println(F(" ms  -> chip alive & in SPI mode"));
-    } else {
-        Serial.println(F("INT never asserted -> not in SPI mode / not running / INT-RST not wired"));
-    }
-}
+// BNO085 reset/INT test -- DISABLED along with the sensor. Each line is
+// commented individually so no comment-in-comment tokens appear below.
+//
+// static void cmdBnoReset() {
+//     pinMode(BNO08X_INT, INPUT_PULLUP);
+//     Serial.print(F("BNO INT idle = ")); Serial.println(digitalRead(BNO08X_INT));
+//
+//     pinMode(BNO08X_RESET, OUTPUT);
+//     digitalWrite(BNO08X_RESET, HIGH);
+//     delay(10);
+//     digitalWrite(BNO08X_RESET, LOW);
+//     delay(10);
+//     digitalWrite(BNO08X_RESET, HIGH);
+//
+//     unsigned long t0 = millis();
+//     while (digitalRead(BNO08X_INT) == HIGH && (millis() - t0) < 2000) { /* spin */ }
+//
+//     if (digitalRead(BNO08X_INT) == LOW) {
+//         Serial.print(F("INT asserted after "));
+//         Serial.print(millis() - t0);
+//         Serial.println(F(" ms  -> chip alive & in SPI mode"));
+//     } else {
+//         Serial.println(F("INT never asserted -> not in SPI mode / not running / INT-RST not wired"));
+//     }
+// }
 
 static void cmdLoop() {
     pinMode(11, OUTPUT);
@@ -322,11 +329,12 @@ static void handle(char *s) {
         cmdDps();
     } else if (ieq(tok[0], "dpsdump")) {
         cmdDpsDump();
-    } else if (ieq(tok[0], "int")) {
-        Serial.print(F("BNO INT (D")); Serial.print(BNO08X_INT);
-        Serial.print(F(") = ")); Serial.println(digitalRead(BNO08X_INT));
-    } else if (ieq(tok[0], "bnoreset")) {
-        cmdBnoReset();
+    // BNO085 commands disabled along with the sensor.
+    // } else if (ieq(tok[0], "int")) {
+    //     Serial.print(F("BNO INT (D")); Serial.print(BNO08X_INT);
+    //     Serial.print(F(") = ")); Serial.println(digitalRead(BNO08X_INT));
+    // } else if (ieq(tok[0], "bnoreset")) {
+    //     cmdBnoReset();
     } else if (ieq(tok[0], "loop")) {
         cmdLoop();
     } else {
@@ -352,23 +360,24 @@ static void runAutoDiagnostics() {
     Serial.println(F("[4] DPS310 register dump 0x00..0x1F"));
     cmdDpsDump();
 
-    Serial.println(F("[5] BNO085 reset + INT timing"));
-    cmdBnoReset();
-
-    pinMode(BNO08X_INT, INPUT_PULLUP);
-    Serial.print(F("[6] BNO INT level after reset test = "));
-    Serial.println(digitalRead(BNO08X_INT));
-
-    Serial.println(F("[7] BNO raw transfer (send 00 00 00 00), each mode:"));
-    for (int m = 0; m <= 3; m++) {
-        g_modeIdx = (uint8_t)m;
-        uint8_t tx[4] = {0, 0, 0, 0};
-        uint8_t rx[4];
-        busTransfer(BNO08X_CS, tx, rx, 4);
-        Serial.print(F("    mode ")); Serial.print(m); Serial.print(F(":"));
-        for (int i = 0; i < 4; i++) { Serial.print(' '); printByte(rx[i]); }
-        Serial.println();
-    }
+    // [5]-[7] BNO085 probes disabled along with the sensor.
+    // Serial.println(F("[5] BNO085 reset + INT timing"));
+    // cmdBnoReset();
+    //
+    // pinMode(BNO08X_INT, INPUT_PULLUP);
+    // Serial.print(F("[6] BNO INT level after reset test = "));
+    // Serial.println(digitalRead(BNO08X_INT));
+    //
+    // Serial.println(F("[7] BNO raw transfer (send 00 00 00 00), each mode:"));
+    // for (int m = 0; m <= 3; m++) {
+    //     g_modeIdx = (uint8_t)m;
+    //     uint8_t tx[4] = {0, 0, 0, 0};
+    //     uint8_t rx[4];
+    //     busTransfer(BNO08X_CS, tx, rx, 4);
+    //     Serial.print(F("    mode ")); Serial.print(m); Serial.print(F(":"));
+    //     for (int i = 0; i < 4; i++) { Serial.print(' '); printByte(rx[i]); }
+    //     Serial.println();
+    // }
 
     Serial.println(F("================ END ('help' for commands) ====="));
 }
@@ -379,14 +388,14 @@ void setup() {
     delay(1000);
 
     parkAllCS();
-    pinMode(BNO08X_INT, INPUT_PULLUP);
+    // pinMode(BNO08X_INT, INPUT_PULLUP);  // BNO085 removed
 
     SPI.begin();  // applies PORTMUX_SPI0_ALT2 -> D11/D12/D13
 
     Serial.println();
     Serial.println(F("================ RAW SPI DIAGNOSTIC ================"));
     Serial.println(F("Type 'help' for the command list."));
-    Serial.println(F("CS aliases: bno=D5 dps=D3 sd=D2. Bytes are hex (e.g. 8D)."));
+    Serial.println(F("CS aliases: dps=D3 sd=D2. Bytes are hex (e.g. 8D)."));
     Serial.println(F("==================================================="));
 
     runAutoDiagnostics();
